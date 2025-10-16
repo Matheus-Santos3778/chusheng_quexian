@@ -1,10 +1,9 @@
 #Pacotes
-library(shiny)
-library(bslib)
-library(thematic)
-library(tidyverse)
-library(gitlink)
-library(bslib)
+packages_list <- c('shiny', 'bslib', 'thematic', 'tidyverse', 'gitlink', 'bslib')
+
+install.packages(packages_list)
+
+lapply(packages_list, library, character.only=TRUE)
 
 data <- read_csv("data/dados_finais.csv")
 
@@ -62,7 +61,7 @@ ui <- fluidPage(
   fluidRow(
     column(4,
            selectInput("tipo_analise", "Tipo de análise:",
-                       choices = c("Bivariado", "Univariado"))
+                       choices = c("Univariado", "Bivariado"))
     ),
     column(4,
            selectInput("anomalia", "Selecione a AC:",
