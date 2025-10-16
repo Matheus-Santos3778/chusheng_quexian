@@ -2,8 +2,4 @@
 .Rhistory
 .RData
 .Ruserdata
-data/BANCO_RES.dbf
-data/GRUPO_AC.xlsx
-data/LISTA_AC.xlsx
-data/MUNICIPIOS_RS.xlsx
-
+/data
