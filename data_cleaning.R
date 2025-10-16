@@ -1,18 +1,9 @@
 #importação da base
-if(!require(readr))install.packages("readr")
-if(!require(readxl))install.packages("readxl")
-if(!require(Epi))install.packages("Epi")
-if(!require(foreign)) install.packages("foreign");library(foreign)
-if(!require(skimr)) install.packages("skimr");library(skimr)
+packages_list <- c('readxl', 'foreign', 'Epi', 'this.path', 'dplyr', 'stringr')
 
-library(writexl) # Para exportar em  excel
-library(readxl)  # Para ler excel
-library(dplyr) #manipulacao de dados
-library(writexl) #exporta??o de dados
-library(ggplot2)
-library(stringr)
-library(tidyr)
-library(cowplot)
+install.packages(packages_list)
+
+lapply(packages_list, library, character.only=TRUE)
 
 #----------------------------------------Importando bases e arquivos -------------------
 setwd(this.path::here())
@@ -58,4 +49,4 @@ for (tipo in names(tipos_lista)) {
   BANCORESUMIDO[[tipo]] <- str_detect(BANCORESUMIDO$CODANOMAL, padrao)
 }
 
-write_csv(BANCORESUMIDO, "data/dados_finais.csv")
+write.csv(BANCORESUMIDO, "data/dados_finais.csv", row.names = FALSE)
