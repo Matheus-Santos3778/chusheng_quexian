@@ -1,11 +1,10 @@
 #Pacotes
-packages_list <- c('shiny', 'bslib', 'thematic', 'tidyverse', 'gitlink', 'bslib')
-
-install.packages(packages_list)
+packages_list <- c('shiny', 'bslib', 'thematic', 'tidyverse', 'gitlink', 'bslib', 'leaflet', 'geobr', 'dplyr')
 
 lapply(packages_list, library, character.only=TRUE)
 
 data <- read_csv("data/dados_finais.csv")
+prevalencias <- read_csv("data/prevalencias.csv")
 
 #Ajustando fatores Escolaridade, local de nascimento, estado civil, raça/cor, e identificação de AC
 data$ESCMAE <-factor(x=data$ESCMAE,
@@ -52,6 +51,9 @@ thematic_shiny()
 
 tam_fonte_eixos <- 10
 
+pr_mun <- geobr::read_municipality(code_muni = 41, year = 2020) %>%
+  sf::st_transform(4326)
+
 #Parâmetros da UI
 ui <- fluidPage(
   theme = bs_theme(bootswatch = "flatly"),
@@ -61,7 +63,7 @@ ui <- fluidPage(
   fluidRow(
     column(4,
            selectInput("tipo_analise", "Tipo de análise:",
-                       choices = c("Univariado", "Bivariado"))
+                       choices = c("Univariado", "Bivariado", "Temporal"))
     ),
     column(4,
            selectInput("anomalia", "Selecione a AC:",
@@ -72,6 +74,20 @@ ui <- fluidPage(
            selectInput("variavel", "Selecione variável explicativa:",
                        choices = c(var_num, var_cat),
                        selected = var_num[1])
+    )
+  ),
+  
+  conditionalPanel(
+    condition = "input.tipo_analise == 'Temporal'",
+    fluidRow(
+      column(
+        width = 12,
+        h3("Mapa Temporal de Prevalência por Município", class = "text-center"),
+        sliderInput("ano_mapa", "Selecione o ano:",
+                    min = 2013, max = 2022, value = 2013, step = 1,
+                    sep = "", animate = TRUE),
+        leafletOutput("mapa_anomalia", height = "600px")
+      )
     )
   ),
   
@@ -87,20 +103,12 @@ server <- function(input, output, session) {
   output$painel_graficos <- renderUI({
     if (input$tipo_analise == "Bivariado") {
       fluidRow(
-        column(8, offset = 2,
-               plotOutput("grafico_bi", height = "500px"))
+        plotOutput("grafico_bi", height = "500px")
       )
-    } else {
+    } else if (input$tipo_analise == "Univariado") {
       fluidRow(
-        column(8, offset = 2,
-               plotOutput("grafico_uni_var", height = "500px"),
-               br(),
-               h4(textOutput("titulo_tabela"), align = "center"),
-               div(
-                 style = "display: flex; justify-content: center;",
-                 tableOutput("tabela_anomalia")
-               )
-        )
+        plotOutput("grafico_uni", height = "500px"),
+        tableOutput("tabela_resumo")
       )
     }
   })
@@ -144,7 +152,7 @@ server <- function(input, output, session) {
   })
   
   #Univariado
-  output$grafico_uni_var <- renderPlot({
+  output$grafico_uni <- renderPlot({
     var <- input$variavel
     
     if (var %in% var_num) {
@@ -172,25 +180,51 @@ server <- function(input, output, session) {
     }
   })
   
-  #Título tabela
-  output$titulo_tabela <- renderText({
-    paste("Resumo - ", input$anomalia)
-  })
-  
-  #Tabela resumo da anomalia
-  output$tabela_anomalia <- renderTable({
-    anom <- input$anomalia
+  #Temporal
+  output$mapa_anomalia <- renderLeaflet({
+    req(input$anomalia, input$ano_mapa)
     
-    data %>%
-      count(valor = .data[[anom]]) %>%
-      mutate(
-        Proporção = scales::percent(n / sum(n), accuracy = 0.01)
+    # filtra o DF de prevalências conforme anomalia e ano
+    dados_filtrados <- prevalencias %>%
+      filter(anomalia == input$anomalia, ANO_NASC == input$ano_mapa)
+    
+    # junta com o shape (garantir tipo numérico e código compatível)
+    pr_mun <- pr_mun %>%
+      mutate(code_muni = as.numeric(code_muni))
+    
+    dados_mapa <- pr_mun %>%
+      left_join(dados_filtrados, by = c("code_muni" = "COD7"))
+    
+    # cria paleta de cores com base nas prevalências existentes
+    dom <- dados_mapa$prevalencia
+    dom_valid <- dom[!is.na(dom)]
+    pal <- colorNumeric("YlOrRd",
+                        domain = if (length(dom_valid) > 0) dom_valid else c(0, 1),
+                        na.color = "gray90")
+    
+    leaflet(dados_mapa) %>%
+      addProviderTiles("CartoDB.Positron") %>%
+      addPolygons(
+        fillColor = ~pal(prevalencia),
+        color = "white", weight = 0.5,
+        fillOpacity = 0.9,
+        label = ~paste0(
+          name_muni, "<br>",
+          ifelse(is.na(prevalencia),
+                 "Sem dados",
+                 paste0(round(prevalencia, 2), " /10k nascidos"))
+        ),
+        labelOptions = labelOptions(direction = "auto")
       ) %>%
-      rename(!!input$anomalia := valor,
-             `Frequência` = n)
+      addLegend(
+        position = "bottomright",
+        pal = pal,
+        values = dom_valid,
+        title = paste("Prevalência de", input$anomalia, "-", input$ano_mapa),
+        labFormat = labelFormat(suffix = " /10k")
+      )
   })
 }
-
 
 #Criar o Shiny APP
 shinyApp(ui = ui, server = server)
