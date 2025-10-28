@@ -277,20 +277,14 @@ server <- function(input, output, session) {
       )
     }
     
-    # 🔹 Paleta com domínio fixo da anomalia selecionada
+    # Paleta com domínio fixo da anomalia selecionada
     pal <- colorNumeric(
-      palette = "YlOrRd",
+      palette = "Greens",
       domain = dom_fixo,
       na.color = "gray90"
     )
     
-    pal <- colorNumeric(
-      palette = "YlOrRd",
-      domain = dom_fixo,
-      na.color = "gray90"
-    )
-    
-    # 🔹 Renderiza o mapa
+    # Renderiza o mapa
     leaflet(dados_mapa) %>%
       addProviderTiles("CartoDB.Positron") %>%
       addPolygons(
