@@ -20,6 +20,8 @@ LISTA_AC<-read_excel(path = 'data/LISTA_AC.xlsx',
 sheet="COD",
 skip=0)
 
+regxmacro <- read.csv('data/regionaisxmacro.csv')
+
 #============= selecionar algumas variaveis do BANCOTOTAL  =================================
 
 # selecao de variaveis
@@ -35,8 +37,7 @@ tipos_lista <- apply(LISTA_AC[-1], 1, function(x) na.omit(x))
 
 names(tipos_lista) <- LISTA_AC$AC
 
-#Listagem agrupando os tipos de AC
-tipos_lista
+regxmacro$REGIONAL <- as.character(regxmacro$REGIONAL)
 
 #Substitui NA por string vazia (para evitar erros no str_detect)
 BANCORESUMIDO$CODANOMAL[is.na(BANCORESUMIDO$CODANOMAL)] <- ""
@@ -52,7 +53,7 @@ for (tipo in names(tipos_lista)) {
 MUNICIPIOS <- MUNICIPIOS %>% 
   distinct(MUNICIPIOS$'COD(6) tipo string', .keep_all = TRUE)
 
-BANCORESUMIDO <- left_join(BANCORESUMIDO, MUNICIPIOS[, c("MUNICIPIOS$\"COD(6) tipo string\"", "COD(7)")], by = c("CODMUNRES" = "MUNICIPIOS$\"COD(6) tipo string\""))
+BANCORESUMIDO <- left_join(BANCORESUMIDO, MUNICIPIOS[, c("MUNICIPIOS$\"COD(6) tipo string\"", "COD(7)", "MACRO", "REGIONAL")], by = c("CODMUNRES" = "MUNICIPIOS$\"COD(6) tipo string\""))
 
 cols_data <- c('DTNASC', 'DTCADASTRO')
 BANCORESUMIDO[cols_data] <- lapply(BANCORESUMIDO[cols_data], as.Date, format= "%d%m%Y")
@@ -62,11 +63,12 @@ BANCORESUMIDO$ANO_NASC <- format(as.Date(BANCORESUMIDO$DTNASC), "%Y")
 BANCORESUMIDO <- BANCORESUMIDO %>%
   rename('COD7' = 'COD(7)')
 
-colnames(BANCORESUMIDO)
+BANCORESUMIDO <- BANCORESUMIDO |>
+  mutate(REGIONAL = paste0("410", sprintf("%02s", REGIONAL)))
 
 ac_agrupadas <- c("Defeito do tubo Neural", "Microcefalia", "Cardiopatias congenitas", "Fendas Orais", "Órgãos genitais", "Defeitos de membros", "Defeitos de parede abdominal", "Sindrome de Dow")
 
-prevalencias <- BANCORESUMIDO %>%
+prevalencias_mun <- BANCORESUMIDO %>%
   pivot_longer(cols = all_of(ac_agrupadas),
                names_to = "anomalia",
                values_to = "val") %>%
@@ -79,5 +81,46 @@ prevalencias <- BANCORESUMIDO %>%
     .groups = "drop"
   )
 
+prevalencias_reg <- BANCORESUMIDO %>%
+  pivot_longer(cols = all_of(ac_agrupadas),
+               names_to = "anomalia",
+               values_to = "val") %>%
+  mutate(val = as.integer(val)) %>%
+  group_by(REGIONAL, ANO_NASC, anomalia) %>%
+  summarise(
+    nascidos = n(),
+    casos = sum(val, na.rm = TRUE),
+    prevalencia = ifelse(nascidos > 0, (casos / nascidos) * 10000, NA_real_),
+    .groups = "drop"
+  )
+
+prevalencias_macro <- BANCORESUMIDO %>%
+  pivot_longer(cols = all_of(ac_agrupadas),
+               names_to = "anomalia",
+               values_to = "val") %>%
+  mutate(val = as.integer(val)) %>%
+  group_by(MACRO, ANO_NASC, anomalia) %>%
+  summarise(
+    nascidos = n(),
+    casos = sum(val, na.rm = TRUE),
+    prevalencia = ifelse(nascidos > 0, (casos / nascidos) * 10000, NA_real_),
+    .groups = "drop"
+  )
+
+prevalencias_mun <- prevalencias_mun[!is.na(prevalencias_mun$COD7),]
+prevalencias_reg <- prevalencias_reg[!is.na(prevalencias_reg$REGIONAL),]
+prevalencias_macro <- prevalencias_macro[!is.na(prevalencias_macro$MACRO),]
+
+prevalencias_reg <- left_join(prevalencias_reg, regxmacro[, c("REGIONAL", "MACRO")], by = c("REGIONAL" = "REGIONAL"))
+
+prevalencias_reg <- left_join(prevalencias_reg, prevalencias_macro[, c("MACRO", "ANO_NASC", "anomalia" , "prevalencia")], by = c("MACRO", "ANO_NASC", "anomalia"))
+
+prevalencias_reg <- prevalencias_reg %>%
+  rename('prev_macro' = 'prevalencia.y')
+
+prevalencias_reg <- prevalencias_reg %>%
+  rename('prev_reg' = 'prevalencia.x')
+
 write.csv(BANCORESUMIDO, "data/dados_finais.csv", row.names = FALSE)
-write.csv(prevalencias, "data/prevalencias.csv", row.names = FALSE)
+write.csv(prevalencias_mun, "data/prev_mun.csv", row.names = FALSE)
+write.csv(prevalencias_reg, "data/prev_reg.csv", row.names = FALSE)
