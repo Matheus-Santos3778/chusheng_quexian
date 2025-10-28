@@ -1,10 +1,11 @@
 #Pacotes
-packages_list <- c('shiny', 'bslib', 'thematic', 'tidyverse', 'gitlink', 'bslib', 'leaflet', 'geobr', 'dplyr')
+packages_list <- c('shiny', 'bslib', 'thematic', 'tidyverse', 'gitlink', 'bslib', 'leaflet', 'geobr', 'dplyr', 'sf')
 
 lapply(packages_list, library, character.only=TRUE)
 
 data <- read_csv("data/dados_finais.csv")
-prevalencias <- read_csv("data/prevalencias.csv")
+prev_mun <- read_csv("data/prev_mun.csv")
+prev_rm <- read_csv("data/prev_reg.csv")
 
 #Ajustando fatores Escolaridade, local de nascimento, estado civil, raça/cor, e identificação de AC
 data$ESCMAE <-factor(x=data$ESCMAE,
@@ -51,8 +52,10 @@ thematic_shiny()
 
 tam_fonte_eixos <- 10
 
-pr_mun <- geobr::read_municipality(code_muni = 41, year = 2020) %>%
-  sf::st_transform(4326)
+pr_mun   <- read_municipality(code_muni = 41, year = 2020) %>% st_transform(4326)
+
+pr_reg   <- read_health_region(year = 2013) %>% 
+  filter(abbrev_state == "PR") %>% st_transform(4326)
 
 #Parâmetros da UI
 ui <- fluidPage(
@@ -82,10 +85,19 @@ ui <- fluidPage(
     fluidRow(
       column(
         width = 12,
-        h3("Mapa Temporal de Prevalência por Município", class = "text-center"),
-        sliderInput("ano_mapa", "Selecione o ano:",
-                    min = 2013, max = 2022, value = 2013, step = 1,
-                    sep = "", animate = TRUE),
+        uiOutput("titulo_mapa"),
+        fluidRow(
+          column(4,
+                 selectInput("nivel_geo", "Nível geográfico:",
+                             choices = c("Municipal", "Regional", "Macroregional"),
+                             selected = "Municipal")
+          ),
+          column(8,
+                 sliderInput("ano_mapa", "Selecione o ano:",
+                             min = 2013, max = 2022, value = 2013,
+                             step = 1, sep = "", animate = TRUE)
+          )
+        ),
         leafletOutput("mapa_anomalia", height = "600px")
       )
     )
@@ -180,46 +192,126 @@ server <- function(input, output, session) {
     }
   })
   
+  #Título Mapa Temporal
+  output$titulo_mapa <- renderUI({
+    req(input$anomalia, input$ano_mapa, input$nivel_geo)
+    
+    nivel_texto <- switch(
+      input$nivel_geo,
+      "Municipal" = "Município",
+      "Regional" = "Regional de Saúde",
+      "Macroregional" = "Macroregional de Saúde"
+    )
+    
+    titulo <- paste0(
+      "Prevalência de ", input$anomalia, 
+      " por ", nivel_texto, 
+      " em ", input$ano_mapa
+    )
+    
+    h3(
+      titulo,
+      style = "text-align:center; margin-top:10px; font-weight:600;"
+    )
+  })
+  
   #Temporal
   output$mapa_anomalia <- renderLeaflet({
-    req(input$anomalia, input$ano_mapa)
+    req(input$anomalia, input$ano_mapa, input$nivel_geo)
     
-    # filtra o DF de prevalências conforme anomalia e ano
-    dados_filtrados <- prevalencias %>%
+    # 🔹 Dicionário com metadados de cada nível
+    niveis <- list(
+      "Municipal" = list(
+        df = prev_mun,
+        shape = pr_mun,
+        join_key = c("code_muni" = "COD7"),
+        col_prev = "prevalencia",
+        label_col = "name_muni"
+      ),
+      "Regional" = list(
+        df = prev_rm,
+        shape = pr_reg,
+        join_key = c("code_health_region" = "REGIONAL"),
+        col_prev = "prev_reg",
+        label_col = "name_health_region"
+      ),
+      "Macroregional" = list(
+        df = prev_rm,
+        shape = pr_reg,  # usa o mesmo shape do regional
+        join_key = c("code_health_region" = "REGIONAL"),
+        col_prev = "prev_macro",
+        label_col = "name_health_region"
+      )
+    )
+    
+    # 🔹 Recupera as configurações do nível selecionado
+    nivel_info <- niveis[[input$nivel_geo]]
+    
+    # 🔹 Filtra os dados correspondentes
+    dados <- nivel_info$df %>%
       filter(anomalia == input$anomalia, ANO_NASC == input$ano_mapa)
     
-    # junta com o shape (garantir tipo numérico e código compatível)
-    pr_mun <- pr_mun %>%
-      mutate(code_muni = as.numeric(code_muni))
+    # 🔹 Faz o join com o shape
+    dados_mapa <- nivel_info$shape %>%
+      left_join(dados, by = nivel_info$join_key)
     
-    dados_mapa <- pr_mun %>%
-      left_join(dados_filtrados, by = c("code_muni" = "COD7"))
+    # 🔹 Extrai os campos corretos
+    var_prev <- dados_mapa[[nivel_info$col_prev]]
+    label_nome <- dados_mapa[[nivel_info$label_col]]
     
-    # cria paleta de cores com base nas prevalências existentes
-    dom <- dados_mapa$prevalencia
-    dom_valid <- dom[!is.na(dom)]
-    pal <- colorNumeric("YlOrRd",
-                        domain = if (length(dom_valid) > 0) dom_valid else c(0, 1),
-                        na.color = "gray90")
+    #Define domínio fixo por tipo geográfico e anomalia
+    if (input$nivel_geo == "Municipal") {
+      dom_fixo <- range(
+        prev_mun$prevalencia[prev_mun$anomalia == input$anomalia],
+        na.rm = TRUE
+      )
+    } else if (input$nivel_geo == "Regional") {
+      dom_fixo <- range(
+        prev_rm$prev_reg[prev_rm$anomalia == input$anomalia],
+        na.rm = TRUE
+      )
+    } else { # Macroregional
+      dom_fixo <- range(
+        prev_rm$prev_macro[prev_rm$anomalia == input$anomalia],
+        na.rm = TRUE
+      )
+    }
     
+    # 🔹 Paleta com domínio fixo da anomalia selecionada
+    pal <- colorNumeric(
+      palette = "YlOrRd",
+      domain = dom_fixo,
+      na.color = "gray90"
+    )
+    
+    pal <- colorNumeric(
+      palette = "YlOrRd",
+      domain = dom_fixo,
+      na.color = "gray90"
+    )
+    
+    # 🔹 Renderiza o mapa
     leaflet(dados_mapa) %>%
       addProviderTiles("CartoDB.Positron") %>%
       addPolygons(
-        fillColor = ~pal(prevalencia),
-        color = "white", weight = 0.5,
-        fillOpacity = 0.9,
-        label = ~paste0(
-          name_muni, "<br>",
-          ifelse(is.na(prevalencia),
-                 "Sem dados",
-                 paste0(round(prevalencia, 2), " /10k nascidos"))
+        fillColor = ~pal(var_prev),
+        color = "#BBB",         # cor da borda
+        weight = 1,              # espessura da linha
+        opacity = 1,             # opacidade da linha
+        fillOpacity = 0.8,       # transparência do preenchimento
+        smoothFactor = 0.2,      # suaviza os contornos
+        highlightOptions = highlightOptions(
+          weight = 2,
+          color = "#666",
+          fillOpacity = 0.9,
+          bringToFront = TRUE
         ),
-        labelOptions = labelOptions(direction = "auto")
+        label = ~paste0(label_nome, ": ", round(var_prev, 1), " /10k")
       ) %>%
       addLegend(
         position = "bottomright",
         pal = pal,
-        values = dom_valid,
+        values = dom_fixo,
         title = paste("Prevalência de", input$anomalia, "-", input$ano_mapa),
         labFormat = labelFormat(suffix = " /10k")
       )
