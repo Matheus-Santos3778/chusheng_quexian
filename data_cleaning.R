@@ -1,7 +1,7 @@
 #importação da base
-packages_list <- c('readxl', 'foreign', 'Epi', 'this.path', 'dplyr', 'stringr')
+packages_list <- c('readxl', 'foreign', 'Epi', 'this.path', 'dplyr', 'stringr', 'tidyr')
 
-install.packages(packages_list)
+#install.packages(packages_list)
 
 lapply(packages_list, library, character.only=TRUE)
 
@@ -49,4 +49,35 @@ for (tipo in names(tipos_lista)) {
   BANCORESUMIDO[[tipo]] <- str_detect(BANCORESUMIDO$CODANOMAL, padrao)
 }
 
+MUNICIPIOS <- MUNICIPIOS %>% 
+  distinct(MUNICIPIOS$'COD(6) tipo string', .keep_all = TRUE)
+
+BANCORESUMIDO <- left_join(BANCORESUMIDO, MUNICIPIOS[, c("MUNICIPIOS$\"COD(6) tipo string\"", "COD(7)")], by = c("CODMUNRES" = "MUNICIPIOS$\"COD(6) tipo string\""))
+
+cols_data <- c('DTNASC', 'DTCADASTRO')
+BANCORESUMIDO[cols_data] <- lapply(BANCORESUMIDO[cols_data], as.Date, format= "%d%m%Y")
+
+BANCORESUMIDO$ANO_NASC <- format(as.Date(BANCORESUMIDO$DTNASC), "%Y")
+
+BANCORESUMIDO <- BANCORESUMIDO %>%
+  rename('COD7' = 'COD(7)')
+
+colnames(BANCORESUMIDO)
+
+ac_agrupadas <- c("Defeito do tubo Neural", "Microcefalia", "Cardiopatias congenitas", "Fendas Orais", "Órgãos genitais", "Defeitos de membros", "Defeitos de parede abdominal", "Sindrome de Dow")
+
+prevalencias <- BANCORESUMIDO %>%
+  pivot_longer(cols = all_of(ac_agrupadas),
+               names_to = "anomalia",
+               values_to = "val") %>%
+  mutate(val = as.integer(val)) %>%
+  group_by(COD7, ANO_NASC, anomalia) %>%
+  summarise(
+    nascidos = n(),
+    casos = sum(val, na.rm = TRUE),
+    prevalencia = ifelse(nascidos > 0, (casos / nascidos) * 10000, NA_real_),
+    .groups = "drop"
+  )
+
 write.csv(BANCORESUMIDO, "data/dados_finais.csv", row.names = FALSE)
+write.csv(prevalencias, "data/prevalencias.csv", row.names = FALSE)
