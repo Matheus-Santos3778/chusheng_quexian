@@ -1,32 +1,51 @@
 #Pacotes
-packages_list <- c('shiny', 'bslib', 'thematic', 'tidyverse', 'gitlink', 'bslib', 'leaflet', 'geobr', 'dplyr', 'sf')
+packages_list <- c("shiny", "bslib", "thematic", "tidyverse", "gitlink"
+                   , "bslib", "leaflet", "geobr", "dplyr", "sf")
 
-lapply(packages_list, library, character.only=TRUE)
+lapply(packages_list, library, character.only = TRUE)
 
 data <- read_csv("data/dados_finais.csv")
 prev_mun <- read_csv("data/prev_mun.csv")
 prev_rm <- read_csv("data/prev_reg.csv")
 
-#Ajustando fatores Escolaridade, local de nascimento, estado civil, raça/cor, e identificação de AC
-data$ESCMAE <-factor(x=data$ESCMAE,
-                              levels = c("1", "2", "3", "4", "5", "9"),
-                              labels = c("Nenhuma", "1a3anos", "4a7anos", "8a11anos", "12anosemais", "ignorado"))
+#data$SEXO[data$`Defeito do tubo Neural` == 'FALSE']
+#Ajustando fatores Escolaridade, local de nascimento
+#estado civil, raça/cor, e identificação de AC
+data$ESCMAE <- factor(x = data$ESCMAE,
+                      levels = c("1", "2", "3", "4", "5", "9"),
+                      labels = c("Nenhuma", "1a3anos", "4a7anos"
+                                 , "8a11anos", "12anosemais", "ignorado"))
 
-data$LOCNASC <-factor(x=data$LOCNASC,
-                               levels = c("1", "2", "3", "4"),
-                               labels = c("Hospital", "Outros estabelecimentos de saúde", "Domicílio", "Outros"))
+data$LOCNASC <- factor(x = data$LOCNASC,
+                       levels = c("1", "2", "3", "4"),
+                       labels = c("Hospital", "Outros estabelecimentos de saúde"
+                                  , "Domicílio", "Outros"))
 
-data$ESTCIVMAE <-factor(x=data$ESTCIVMAE,
+data$ESTCIVMAE <- factor(x=data$ESTCIVMAE,
                                  levels = c("1", "2", "3", "4", "5", "9"),
                                  labels = c("solteira", "Casada", "Viúva", "Separada jud.", "União estável", "Ignorada"))
 
-data$RACACORMAE <-factor(x=data$RACACORMAE,
+data$RACACORMAE <- factor(x=data$RACACORMAE,
                                   levels = c("1", "2", "3", "4", "5"),
                                   labels = c("Branca", "Preta", "Amarela", "Parda", "Indígena"))
 
-data$IDANOMAL <-factor(x=data$IDANOMAL,
+data$IDANOMAL <- factor(x=data$IDANOMAL,
                                 levels = c("1", "2", "9"),
                                 labels = c("Sim", "Não", "Ignorada"))
+
+data$SEXO[data$SEXO == "M"] <- 1
+data$SEXO[data$SEXO == "F"] <- 2
+data$SEXO[data$SEXO == "I"] <- 9
+
+data$SEXO <- factor(x=data$SEXO,
+                        levels = c("1", "2", "9"),
+                        labels = c("M", "F", "I"))
+
+data$CONSULTAS <- factor(x=data$CONSULTAS,
+                         levels = c("1", "2", "3", "4", "9"),
+                         labels = c("Nenhuma", "De 1 a 3", "De 4 a 6", "7 e mais", "Ignorado"))
+
+data$IDADEMAE[data$IDADEMAE == 99] <- NA
 
 #Transformando colunas para numéricas
 cols_num <- c("IDADEMAE", "QTDFILVIVO", "QTDFILMORT", "QTDGESTANT", "QTDPARTCES", "QTDPARTNOR", "GRAVIDEZ", "PARTO", "CONSULTAS", "APGAR1", "APGAR5", "PESO", "SEMAGESTAC", "GESTACAO")
