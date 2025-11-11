@@ -10,6 +10,11 @@ setwd(this.path::here())
 #utilizando o argumento "as.is=TRUE"para transformar os dados em caracteres
 BANCOTOTAL<- read.dbf(file = 'data/BANCO_RES.dbf', as.is = TRUE)
 
+cols_data <- c('DTNASC', 'DTCADASTRO', 'DTULTMENST')
+BANCOTOTAL[cols_data] <- lapply(BANCOTOTAL[cols_data], as.Date, format= "%d%m%Y")
+
+BANCOTOTAL$ULTMENST <- as.numeric(BANCOTOTAL$DTNASC - BANCOTOTAL$DTULTMENST)
+
 #importar o arquivo em excel MUNICIPIOS DO PR com códigos. Para encontrar a pasta aqui usa-se 'path'
 MUNICIPIOS<-read_excel(path = 'data/MUNICIPIOS_RS.xlsx',
 sheet="Muni_cod",
@@ -26,7 +31,10 @@ regxmacro <- read.csv('data/regionaisxmacro.csv')
 
 # selecao de variaveis
 BANCORESUMIDO <-  BANCOTOTAL |> 
-  select(CODMUNNASC, CODESTAB, CODMUNRES, LOCNASC, IDADEMAE, ESTCIVMAE, ESCMAE, CODOCUPMAE, QTDFILVIVO, QTDFILMORT,QTDGESTANT, QTDPARTCES, QTDPARTNOR, GRAVIDEZ, PARTO, CONSULTAS, DTNASC, SEXO, APGAR1, APGAR5, RACACORMAE, PESO, IDANOMAL, CODANOMAL, DTCADASTRO, SEMAGESTAC, GESTACAO)
+  select(CODMUNNASC, CODESTAB, CODMUNRES, LOCNASC, IDADEMAE, ESTCIVMAE, ESCMAE
+         , CODOCUPMAE, QTDFILVIVO, QTDFILMORT,QTDGESTANT, QTDPARTCES, QTDPARTNOR
+         , GRAVIDEZ, PARTO, CONSULTAS, DTNASC, SEXO, APGAR1, APGAR5, RACACORMAE
+         , PESO, IDANOMAL, CODANOMAL, DTCADASTRO, SEMAGESTAC, GESTACAO, IDADEPAI, ULTMENST)
 
 ##Criando variáveis que identificam a presença de cada tipo de Anomalia
 #Limpa os códigos na base de tipos (remove o "-descrição")

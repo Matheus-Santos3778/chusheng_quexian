@@ -15,10 +15,12 @@ data <- transform_data(data)
 ac_agrupadas <- c("Defeito do tubo Neural", "Microcefalia", "Cardiopatias congenitas", "Fendas Orais", "Órgãos genitais", "Defeitos de membros", "Defeitos de parede abdominal", "Sindrome de Dow")
 
 #Variáveis Contínuas
-var_num <- c('IDADEMAE', 'PESO')
+var_num <- c('IDADEMAE', 'PESO', 'IDADEPAI', 'ULTMENST')
 
 #Variáveis Categóricas ou Discretas com poucos valores
-var_cat <- c('ESCMAE', 'SEXO', 'RACACORMAE', 'ESTCIVMAE', 'QTDFILVIVO', 'CONSULTAS', 'APGAR1', 'APGAR5')
+var_cat <- c('ESCMAE', 'SEXO', 'RACACORMAE', 'ESTCIVMAE', 'QTDFILVIVO', 'QTDFILMORTO'
+             , 'CONSULTAS', 'APGAR1', 'APGAR5', 'LOCNASC', 'CODOCUPMAE', 'QTDGESTANT',
+             'QTDPARTCES', 'QTDPARTNOR', 'GRAVIDEZ', 'PARTO', 'SEMAGESTAC', 'GESTACAO')
 
 #Tema ggplot
 ggplot2::theme_set(ggplot2::theme_minimal())
@@ -38,3 +40,4 @@ source("server.r")
 
 #Criar o Shiny APP
 shinyApp(ui = ui, server = server)
+  
