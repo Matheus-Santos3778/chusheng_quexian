@@ -8,6 +8,10 @@ data <- read_csv("data/dados_finais.csv")
 prev_mun <- read_csv("data/prev_mun.csv")
 prev_rm <- read_csv("data/prev_reg.csv")
 
+#Removendo 2 outliers de ULTMENST
+data$ULTMENST[data$ULTMENST == 22518] <- NA
+data$ULTMENST[data$ULTMENST == 30448] <- NA
+
 source("data_transform.r")
 
 data <- transform_data(data)
@@ -43,4 +47,3 @@ source("server.r")
 
 #Criar o Shiny APP
 shinyApp(ui = ui, server = server)
-  
