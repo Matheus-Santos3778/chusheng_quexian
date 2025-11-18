@@ -15,10 +15,13 @@ data <- transform_data(data)
 ac_agrupadas <- c("Defeito do tubo Neural", "Microcefalia", "Cardiopatias congenitas", "Fendas Orais", "Órgãos genitais", "Defeitos de membros", "Defeitos de parede abdominal", "Sindrome de Dow")
 
 #Variáveis Contínuas
-var_num <- c('IDADEMAE', 'PESO', 'IDADEPAI', 'ULTMENST')
+var_num <- c('IDADEMAE', 'PESO', 'IDADEPAI', 'ULTMENST', 'taxa_de_analfabetismo'
+             , 'cobertura_bcg', 'porcentagem_da_populacao_baixa_renda', 'mortalidade'
+             , 'idhm', 'idhm_educacao', 'idhm_longevidade', 'idhm_renda', 
+             'renda_domiciliar_per_capita')
 
 #Variáveis Categóricas ou Discretas com poucos valores
-var_cat <- c('ESCMAE', 'SEXO', 'RACACORMAE', 'ESTCIVMAE', 'QTDFILVIVO', 'QTDFILMORTO'
+var_cat <- c('ESCMAE', 'SEXO', 'RACACORMAE', 'ESTCIVMAE', 'QTDFILVIVO', 'QTDFILMORT'
              , 'CONSULTAS', 'APGAR1', 'APGAR5', 'LOCNASC', 'CODOCUPMAE', 'QTDGESTANT',
              'QTDPARTCES', 'QTDPARTNOR', 'GRAVIDEZ', 'PARTO', 'SEMAGESTAC', 'GESTACAO')
 
