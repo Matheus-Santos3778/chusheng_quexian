@@ -1,8 +1,6 @@
 #importação da base
 packages_list <- c('readxl', 'foreign', 'Epi', 'this.path', 'dplyr', 'stringr', 'tidyr')
-
 #install.packages(packages_list)
-
 lapply(packages_list, library, character.only=TRUE)
 
 #----------------------------------------Importando bases e arquivos -------------------
@@ -15,17 +13,24 @@ BANCOTOTAL[cols_data] <- lapply(BANCOTOTAL[cols_data], as.Date, format= "%d%m%Y"
 
 BANCOTOTAL$ULTMENST <- as.numeric(BANCOTOTAL$DTNASC - BANCOTOTAL$DTULTMENST)
 
-#importar o arquivo em excel MUNICIPIOS DO PR com códigos. Para encontrar a pasta aqui usa-se 'path'
 MUNICIPIOS<-read_excel(path = 'data/MUNICIPIOS_RS.xlsx',
 sheet="Muni_cod",
 skip=0)
 
-# importar lista AC prioritária
 LISTA_AC<-read_excel(path = 'data/LISTA_AC.xlsx',
 sheet="COD",
 skip=0)
 
 regxmacro <- read.csv('data/regionaisxmacro.csv')
+regxmacro$REGIONAL <- as.character(regxmacro$REGIONAL)
+
+#Bases indicadores
+idhm <- read.csv('data/indicadores/idhm.csv', sep = ';')
+cob_bcg <- read.csv('data/indicadores/cobertura_bcg.csv', sep = ';')
+baixa_renda <- read.csv('data/indicadores/porc_baixarenda.csv', sep = ';')
+renda_pcap <- read.csv('data/indicadores/renda_dompercap.csv', sep = ';')
+analfabetismo <- read.csv('data/indicadores/taxa_analfabetismo.csv', sep = ';')
+mortalidade <- read.csv('data/indicadores/taxa_mortalidade.csv', sep = ';')
 
 #============= selecionar algumas variaveis do BANCOTOTAL  =================================
 
@@ -44,8 +49,6 @@ LISTA_AC[] <- lapply(LISTA_AC, function(x) sub("-.*", "", x))
 tipos_lista <- apply(LISTA_AC[-1], 1, function(x) na.omit(x))
 
 names(tipos_lista) <- LISTA_AC$AC
-
-regxmacro$REGIONAL <- as.character(regxmacro$REGIONAL)
 
 #Substitui NA por string vazia (para evitar erros no str_detect)
 BANCORESUMIDO$CODANOMAL[is.na(BANCORESUMIDO$CODANOMAL)] <- ""
@@ -76,7 +79,28 @@ BANCORESUMIDO <- BANCORESUMIDO |>
 
 ac_agrupadas <- c("Defeito do tubo Neural", "Microcefalia", "Cardiopatias congenitas", "Fendas Orais", "Órgãos genitais", "Defeitos de membros", "Defeitos de parede abdominal", "Sindrome de Dow")
 
-prevalencias_mun <- BANCORESUMIDO %>%
+#Variáveis municipais
+indicadores <- left_join(baixa_renda, cob_bcg[, c("municipio", "cobertura_bcg")], by = "municipio")
+indicadores <- left_join(indicadores, mortalidade[, c("municipio", "mortalidade")], by = "municipio")
+indicadores <- left_join(indicadores, renda_pcap[, c("municipio", "renda_domiciliar_per_capita")], by = "municipio")
+indicadores <- left_join(indicadores, analfabetismo[, c("municipio", "taxa_de_analfabetismo")], by = "municipio")
+
+indicadores$cod6 <- sub(" .*", "", indicadores$municipio)
+
+idhm$cod6 <- substr(idhm$codigo, 1, 6)
+
+#Base final de indicadores
+indicadores <- left_join(indicadores, idhm[, c("cod6", "idhm", "idhm_educacao", "idhm_longevidade", "idhm_renda", "codigo")], by = "cod6")
+indicadores$codigo <- as.character(indicadores$codigo)
+
+#Juntando Base Resumida com Indicadores
+base_final <- left_join(BANCORESUMIDO, indicadores[, c("cod6", "idhm", "idhm_educacao", "idhm_longevidade", "idhm_renda"
+                                                       , "porcentagem_da_populacao_baixa_renda", "cobertura_bcg", "mortalidade"
+                                                       , "renda_domiciliar_per_capita", "taxa_de_analfabetismo")], by = c("CODMUNRES" = "cod6"))
+
+
+#Prevalências
+prevalencias_mun <- base_final %>%
   pivot_longer(cols = all_of(ac_agrupadas),
                names_to = "anomalia",
                values_to = "val") %>%
@@ -89,7 +113,7 @@ prevalencias_mun <- BANCORESUMIDO %>%
     .groups = "drop"
   )
 
-prevalencias_reg <- BANCORESUMIDO %>%
+prevalencias_reg <- base_final %>%
   pivot_longer(cols = all_of(ac_agrupadas),
                names_to = "anomalia",
                values_to = "val") %>%
@@ -102,7 +126,7 @@ prevalencias_reg <- BANCORESUMIDO %>%
     .groups = "drop"
   )
 
-prevalencias_macro <- BANCORESUMIDO %>%
+prevalencias_macro <- base_final %>%
   pivot_longer(cols = all_of(ac_agrupadas),
                names_to = "anomalia",
                values_to = "val") %>%
@@ -129,6 +153,6 @@ prevalencias_reg <- prevalencias_reg %>%
 prevalencias_reg <- prevalencias_reg %>%
   rename('prev_reg' = 'prevalencia.x')
 
-write.csv(BANCORESUMIDO, "data/dados_finais.csv", row.names = FALSE)
+write.csv(base_final, "data/dados_finais.csv", row.names = FALSE)
 write.csv(prevalencias_mun, "data/prev_mun.csv", row.names = FALSE)
 write.csv(prevalencias_reg, "data/prev_reg.csv", row.names = FALSE)
